@@ -14,6 +14,7 @@ if(!require(tidyr)) install.packages('tidyr',repos = 'http://cran.us.r-project.o
 library(dplyr)
 library(tidyverse)
 library(tidyr)
+
 library(ggplot2)
 library(caret)
 library(data.table)
@@ -125,7 +126,7 @@ MODEL_1 <- train(data.price ~ ., data = train_set,
 summary(MODEL_1)
 
 #PREDICTING PRICE FOR TEST_SET
-MODEL_1_predict<-predict(linear_model,test_set)
+MODEL_1_predict<-predict(MODEL_1,test_set)
 
 #CALCULATING RMSE FOR THE TEST_SET PREDICTION
 RMSE(MODEL_1_predict,test_set$data.price)
