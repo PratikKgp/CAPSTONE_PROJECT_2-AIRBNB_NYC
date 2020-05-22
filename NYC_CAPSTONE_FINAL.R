@@ -21,7 +21,7 @@ library(caret)
 library(data.table)
 
 
-#Read the csv file dataset (Github repo: "")
+#Read the csv file dataset (Github repo: "https://github.com/PratikKgp/HARVARD_UNIVERSITY-CAPSTONE_DATA_SCIENCE_PROJECT")
 data <- read.csv("AB_NYC_2019.csv")
 
 #-----------------------------------------------------------------------------------------------------------------------------
