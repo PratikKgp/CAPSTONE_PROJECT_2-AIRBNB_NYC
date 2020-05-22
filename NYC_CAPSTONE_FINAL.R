@@ -2,24 +2,26 @@
 #                           INSTALLING PACKAGES AND DOWNLOADING DATASET
 #------------------------------------------------------------------------------------------------------------------------------------
 
+# Install all needed libraries if they are not present
 
 if(!require(dplyr)) install.packages("dplyr",repos = "http://cran.us.r-project.org")
 if(!require(tidyverse)) install.packages("tidyverse",repos = "http://cran.us.r-project.org")
 if(!require(ggplot2)) install.packages("ggplot2",repos = "http://cran.us.r-project.org")
 if(!require(caret)) install.packages("caret",repos = "http://cran.us.r-project.org")
+if(!require(tidyr)) install.packages("tidyr",repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages('data.table',repos = 'http://cran.us.r-project.org')
-if(!require(tidyr)) install.packages('tidyr',repos = 'http://cran.us.r-project.org')
 
 
+#Loading the libraries
+library(ggplot2)
 library(dplyr)
 library(tidyverse)
 library(tidyr)
-
-library(ggplot2)
 library(caret)
 library(data.table)
 
 
+#Read the csv file dataset (Github repo: "")
 data <- read.csv("AB_NYC_2019.csv")
 
 #-----------------------------------------------------------------------------------------------------------------------------
@@ -132,10 +134,10 @@ MODEL_1_predict<-predict(MODEL_1,test_set)
 RMSE(MODEL_1_predict,test_set$data.price)
 
 #PLOTTING THE GRAPHS DEPICTING THE FIT OF THE MODEL
-plot(MODEL_1$finalModel)
+#plot(MODEL_1$finalModel)
 
 #STORING THE OBTAINED RMSE ERROR IN RMSE_results DATAFRAME
-RMSE_results <- data_frame(method = "SIMPLE LINEAR REGRESSION MODEL", RMSE = RMSE(Model_1_predict,test_set$data.price))
+RMSE_results <- data_frame(method = "SIMPLE LINEAR REGRESSION MODEL", RMSE = RMSE(MODEL_1_predict,test_set$data.price))
 
 #----------------------------------------------------------------------------------------------------------
 #                 MODEL 2: LINEAR REGRESSION MODEL WITH LOGARIHTHMIC SCALING OF PRICE
@@ -156,18 +158,17 @@ MODEL_2_predict<-predict(MODEL_2,test_set)
 RMSE(exp(MODEL_2_predict)+1,test_set$data.price)
 
 #PLOTTING THE GRAPHS DEPICTING THE FIT OF THE MODEL
-plot(MODEL_2$finalModel)
+#plot(MODEL_2$finalModel)
 
 #BINDING THE OBTAINED RMSE ERROR WITH RMSE_results DATAFRAME
-RMSE_results <- bind_rows(RMSE_results,data_frame(method="LINEAR REGRESSION MODEL WITH LOGARIHTHMIC SCALING OF PRICE",RMSE = RMSE(exp(Model_2_predict)-1,test_set$data.price) ))
+RMSE_results <- bind_rows(RMSE_results,data_frame(method="LINEAR REGRESSION MODEL WITH LOGARIHTHMIC SCALING OF PRICE",RMSE = RMSE(exp(MODEL_2_predict)-1,test_set$data.price) ))
 
 #-------------------------------------------------------------------------------------------------------
 #                             MODEL 3: XGBOOST LINEAR MODEL
 #------------------------------------------------------------------------------------------------------
 
 #TRAINING THE MODEL ON TRAIN_SET
-MODEL_3 <- train(log(1+data.price) ~ ., data = train_set,
-                 method = "xgbLinear",tuneGrid = expand.grid(nrounds=50,lambda=c(.01,.1),alpha =c(.01, .1),eta = .3))
+MODEL_3 <- train(data.price ~ ., data = train_set,method = "xgbLinear",tuneGrid = expand.grid(nrounds = 50,lambda = seq(0.1, 0.5, 0.2),alpha =seq(0.1,0.5, 0.2),eta = 0.3))
 
 #DISPLAYING SUMMARY OF THE MODEL
 summary(MODEL_3)
@@ -176,14 +177,40 @@ summary(MODEL_3)
 MODEL_3_predict<-predict(MODEL_3,test_set)
 
 #CALCULATING RMSE FOR THE TEST_SET PREDICTION
-RMSE(exp(MODEL_3_predict)-1,test_set$data.price)
+RMSE(MODEL_3_predict,test_set$data.price)
 
 #BINDING THE OBTAINED RMSE ERROR WITH RMSE_results DATAFRAME
-RMSE_results <- bind_rows(RMSE_results,data_frame(method="XGBOOST LINEAR MODEL",RMSE = RMSE(exp(Model_3_predict)-1,test_set$data.price) ))
+RMSE_results <- bind_rows(RMSE_results,data_frame(method="XGBOOST LINEAR MODEL",RMSE = RMSE(MODEL_3_predict,test_set$data.price) ))
 
-----------------------------------------------------------------------------------------------------------------------------------------
- 
+#----------------------------------------------------------------------------------------------------------------------------------------
+#                         MODEL 4:DECISION TREE REGRESSION 
+#-------------------------------------------------------------------------------------------------------------------------------------
+
+
+#TRAINING THE MODEL ON TRAIN_SET
+MODEL_4 <- train(data.price ~ ., data = train_set,
+                 method = "rpart")
+
+#DISPLAYING SUMMARY OF THE MODEL
+MODEL_4$results
+
+#PREDICTING PRICE FOR TEST_SET
+MODEL_4_predict<-predict(MODEL_4,test_set)
+
+#CALCULATING RMSE FOR THE TEST_SET PREDICTION
+RMSE(MODEL_4_predict,test_set$data.price)
+
+
+#BINDING THE OBTAINED RMSE ERROR WITH RMSE_results DATAFRAME
+RMSE_results <- bind_rows(RMSE_results,data_frame(method="DECISION TREE MODEL",RMSE = RMSE(MODEL_4_predict,test_set$data.price) ))
+
+
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
 #DISPLAYING THE RESULTS OF THE ABOVE MODEL
+  
 RMSE_results %>% knitr::kable()
 
 
@@ -197,7 +224,7 @@ RMSE_results %>% knitr::kable()
 VALIDATION_predict<-predict(MODEL_3,validation_set)
 
 #CALCULATING RMSE FOR THE VALIDATION_SET
-VALIDATION_RMSE<-RMSE(exp(VALIDATION_predict)-1,validation_set$data.price)
+VALIDATION_RMSE<-RMSE(VALIDATION_predict,validation_set$data.price)
 
 #DISPLAYING THE VALIDATION SET RMSE 
 tibble(method = "VALIDATION_SET RMSE USING MODEL 3", RMSE = VALIDATION_RMSE) %>% knitr::kable()
@@ -207,9 +234,9 @@ tibble(method = "VALIDATION_SET RMSE USING MODEL 3", RMSE = VALIDATION_RMSE) %>%
 
 #THUS THIS MAKES IT NECESSARY TO CALCULATE AN RMSE WITHOUT TAKING INTO CONSIDERATION THE OUTLIERS
 
-#Calculating the RMSE for the validation data_Set for the prices lying below 0.9
-index<-validation_set$data.price < quantile(validation_set$data.price,0.9)
-VALIDATION_RMSE_<-RMSE(exp(VALIDATION_predict[index])-1,validation_set$data.price[index])
+#Calculating the RMSE for the validation data_Set for the prices lying below 0.95
+index<-validation_set$data.price < quantile(validation_set$data.price,0.95)
+VALIDATION_RMSE_<-RMSE(VALIDATION_predict[index],validation_set$data.price[index])
 
 #RMSE FOR THE VALIDATIONS_SET NOT CONTAINING THE OUTLIERS
 tibble(method = "VALIDATION_SET RMSE AFTER FILTERING OUT OUTLIERS", RMSE = VALIDATION_RMSE_) %>% knitr::kable()

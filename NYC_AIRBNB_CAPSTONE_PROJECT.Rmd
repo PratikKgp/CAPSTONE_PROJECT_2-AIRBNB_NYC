@@ -385,8 +385,9 @@ XGBoost Linear Algorithm which is designed to be highly efficient and flexible i
 
 
 ```{r,echo=TRUE,warning=FALSE }
-Model_3 <- train(log(1+data.price) ~ ., data = train_set,
-                        method = "xgbLinear",tuneGrid = expand.grid(nrounds=50,lambda=c(.01,.1),alpha =c(.01, .1),eta = .3))
+Model_3 <- train(data.price ~ ., data = train_set,
+                        method = "xgbLinear",
+                 tuneGrid = expand.grid(nrounds = 50,lambda = seq(0.1, 0.5, 0.2),alpha =seq(0.1,0.5, 0.2),eta = 0.3))
 
 ```
 
@@ -400,20 +401,63 @@ Model_3_predict<-predict(Model_3,test_set)
 #### RMSE Error on **test_set** :
 
 ```{r}
-RMSE(exp(Model_3_predict)-1,test_set$data.price)
+RMSE(Model_3_predict,test_set$data.price)
 ```
 
 ```{r, echo=FALSE}
 RMSE_results <- bind_rows(RMSE_results,
-                          data_frame(method="XGBOOST LINEAR MODEL",RMSE = RMSE(exp(Model_3_predict)-1,test_set$data.price) ))
+                          data_frame(method="XGBOOST LINEAR MODEL",RMSE = RMSE(Model_3_predict,test_set$data.price) ))
 ```
 
 \newpage
 
 
+### 3.4 DECISION TREE MODEL :
+
+\leavevmode 
+\newline
+
+A decison tree algorithm is performed on **Y** = **price** and **X** containing the columns **latitude**, **longitude**, **neighbourhood_group**, **neighbourhood**, **room_type**, **number_of_reviews**, **calculated_host_listings_count**, **minimum_nights**, **reviews_per_month**, **Annual**.
+
+\leavevmode 
+\newline
+
+#### Training is performed on the **train_set** :
+
+
+```{r,echo=TRUE,warning=FALSE }
+MODEL_4 <- train(data.price ~ ., data = train_set,
+                 method = "rpart")
+```
+
+#### Summary of the trained model :
+
+```{r}
+MODEL_4$results
+```
+
+#### Prediction is performed on the **test_set** :
+
+```{r,echo=TRUE,warning=FALSE}
+MODEL_4_predict<-predict(MODEL_4,test_set)
+```
+
+#### RMSE Error on **test_set** :
+```{r}
+RMSE(MODEL_4_predict,test_set$data.price)
+```
+
+```{r, echo=FALSE}
+RMSE_results <- bind_rows(RMSE_results,data_frame(method="DECISION TREE MODEL",RMSE = RMSE(MODEL_4_predict,test_set$data.price) ))
+
+
+```
+
+\newpage
+
 ## 4 RESULTS :
 
-The results obtained by running the above three models by performing training on **train_set** dataset and further testing on the **test_set ** dataset are as follows :
+The results obtained by running the above four models by performing training on **train_set** dataset and further testing on the **test_set ** dataset are as follows :
 
 
 ```{r, echo=FALSE,warning=FALSE}
@@ -437,23 +481,23 @@ VALIDATION_predict<-predict(Model_3,validation_set)
 #### RMSE Error on **validation_set** :
 
 ```{r}
-RMSE(exp(VALIDATION_predict)-1,validation_set$data.price)
+RMSE(VALIDATION_predict,validation_set$data.price)
 ```
 
-The high RMSE Value are due to the Outliers present in the form of High Price Houses in the dataset.
-Thus this makes it necessary to calculate an RMSE without taking into consideration the outliers for an estimate of RMSE error of the model on dataset without the outliers.
+The high RMSE Value are due to the Outliers present in the form of High Rental Price Houses in the dataset.
+Thus this makes it necessary to calculate an RMSE on dataset by filtering the outliers.
 
-#### Calculating the RMSE for the validation data_Set excluding the top 10 percent values.
+#### Calculating the RMSE for the validation data_Set excluding the top 5 percent values.
 
 ```{r,warning=FALSE}
 index<-validation_set$data.price < quantile(validation_set$data.price,0.95)
-VALIDATION_RMSE_<-RMSE(exp(VALIDATION_predict[index])-1,validation_set$data.price[index])
+VALIDATION_RMSE_<-RMSE(VALIDATION_predict[index],validation_set$data.price[index])
 ```
 
 #### RMSE Error for the validation set excluding the outliers
 
 ```{r,warning=FALSE}
-tibble(method = "XGBLINEAR BOOST ON VALIDATION_SET RMSE AFTER FILTERING OUT OUTLIERS"
+tibble(method = "XGBLINEAR BOOST ON VALIDATION_SET AFTER FILTERING OUT OUTLIERS"
        , RMSE = VALIDATION_RMSE_)%>%knitr::kable()
 
 ```
@@ -466,11 +510,11 @@ XgbLinear is the algorithm leading to the least RMSE value for the **test_set**.
 
 ```{r}
 tibble(method = "XGBLINEAR BOOST ON VALIDATION_SET "
-       , RMSE =RMSE(exp(VALIDATION_predict)-1,validation_set$data.price))%>%knitr::kable()
+       , RMSE =RMSE(VALIDATION_predict,validation_set$data.price))%>%knitr::kable()
 
 ```
 
-Also the further analysis of the final model after removing outliers for the **validation_set**, provides a conclusion that the model fits in the better way for the housings after removing the top 5 percent outliers. This is evident by the RMSE value :
+Also the further analysis of the final model after removing outliers for the **validation_set**, provides a conclusion that the model fits in the better way for the housings after filtering the top 5 percent outliers. This is evident by the RMSE value :
 
 ```{r,warning=FALSE}
 tibble(method = "VALIDATION_SET RMSE AFTER FILTERING OUT OUTLIERS"
