@@ -1,0 +1,478 @@
+---
+title: "REPORT - NYC AIRBNB PRICE PREDICTION CAPSTONE PROJECT"
+author: "PRATIK"
+date: "22/05/2020"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    
+
+
+---
+
+```{r setup, include=FALSE,echo=FALSE}
+
+if(!require(dplyr)) install.packages("dplyr",repos = "http://cran.us.r-project.org")
+if(!require(tidyverse)) install.packages("tidyverse",repos = "http://cran.us.r-project.org")
+if(!require(ggplot2)) install.packages("ggplot2",repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret",repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages('data.table',repos = 'http://cran.us.r-project.org')
+if(!require(tidyr)) install.packages('tidyr',repos = 'http://cran.us.r-project.org')
+
+
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(ggplot2)
+library(caret)
+library(data.table)
+
+
+
+data <- read.csv("AB_NYC_2019.csv")
+
+```
+
+```{r , include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. INTRODUCTION:
+
+The project is based on New York City Airbnb dataset. The Aim of the project is to build a model to predict the Rental prices. 
+
+The dataset is provided with the information about hosts, geographical availability and all other necessary metrics available.
+
+The goal of the project is to obtain the best fitting model for prediciting prices by taking the parameter RMSE into consideration.
+
+The key steps to be performed ahead are the **Analysis** of the data and further building a **Model** on the basis of the anaklysis.
+
+The **Strucuture** of the dataset is as follows : 
+
+
+### Structure :
+```{r }
+str(data)
+```
+
+
+\newpage
+
+## 2. DATA EXPLORATORY & ANALYSIS : 
+
+### 2.1 SUMMARY OF THE DATASET:
+
+```{r }
+summary(data)
+```
+
+### 2.2 FIRST 6 ELEMENTS OF THE DATASET :
+
+\leavevmode 
+\newline
+
+```{r }
+head(data)
+```
+
+\newpage
+
+
+### 2.3 DISTRIBUTION OF THE PRICES :
+
+The distribution of the data has a very high density for prices in the lower range.
+Therefore logarithmic scaling of the price data is to be further performed to observed the distribution.
+
+
+```{r , echo=FALSE,fig1, fig.height = 3.5, fig.width = 6,fig.align = "center"}
+data%>%ggplot(aes(price))+geom_density()
+```
+
+
+### 2.4 DISTRIBUTION OF LOG(PRICES) :
+
+```{r , echo=FALSE,fig2, fig.height = 3.5, fig.width = 6, fig.align = "center"}
+data%>%ggplot(aes(log(price)))+geom_density()
+```
+
+\newpage
+
+
+### 2.5 DISTRIBUTION OF PRICES WITH NEIGHBOURHOOD GROUP :
+
+Removing the price outliers by filtering to contain the prices below 1250, we observe that the price distribution (median,25% & 75% percentile) vary with the neighbourhood groups.
+```{r , echo=FALSE,fig3, fig.height = 3.5, fig.width = 6, fig.align = "center"}
+
+data %>% group_by(neighbourhood_group) %>%filter(price<1250)%>%ggplot(aes(x=neighbourhood_group,y=price))+geom_boxplot()
+```
+
+### 2.6 DISTRIBUTION OF PRICES WITH NUMBER OF REVIEWS :
+
+As evident from the graph, for data set having large number of reviews the price is in the lower range. Lesser the number of reviews, the wider is the price range for the data set
+
+```{r , echo=FALSE,fig4, fig.height = 3.5, fig.width = 6, fig.align = "center"}
+
+data%>%filter(price<2000)%>%ggplot(aes(x=number_of_reviews,y=price))+geom_point(size=1,alpha = 0.2)
+
+```
+
+### 2.6 DISTRIBUTION OF PRICES WITH REVIEWS PER MONTH :
+
+As evident from the graph, for data set having large number of reviews per month, the price is in the lower range. Lesser the number of reviews per month, the wider is the price range for the data set
+
+```{r , echo=FALSE,fig5, fig.height = 3.5, fig.width = 6, fig.align = "center"}
+
+data%>%filter(price<2000 & reviews_per_month<20)%>%ggplot(aes(x=reviews_per_month,y=price))+geom_point(size=1,alpha = 0.2)
+
+
+```
+
+### 2.7 DISTRIBUTION OF NEIGHBOURHOOD GROUPS WITH LATITUDE AND LONGITUDE :
+
+```{r , echo=FALSE,fig6, fig.height = 3.5, fig.width = 8, fig.align = "center"}
+
+data%>% ggplot(aes(x=latitude,y=longitude,color=neighbourhood_group))+geom_point(size=1,alpha = 0.2)
+
+
+```
+
+
+### 2.8 DISTRIBUTION OF PRICE WITH LATITUDE AND LONGITUDE :
+
+```{r , echo=FALSE,fig7, fig.height = 4, fig.width = 8, fig.align = "center"}
+
+data%>% filter(price<1250)%>%ggplot(aes(x=latitude,y=longitude,color=price))+geom_point()
+
+
+
+```
+
+
+
+### 2.9 DISTRIBUTION OF PRICE WITH MINIMUM NIGHTS :
+
+```{r , echo=FALSE,fig8, fig.height = 4, fig.width = 8, fig.align = "center"}
+
+data%>% ggplot(aes(x=minimum_nights,y=price))+geom_point(size=1,alpha = 0.2)
+
+
+
+```
+
+\newpage
+### 2.10 DISTRIBUTION OF PRICE VS AVAILABLE 365 :
+
+As through the graph below, no meaningful distribution is observed for price vs availability_365
+
+```{r , echo=FALSE,fig9, fig.height = 4, fig.width = 8, fig.align = "center"}
+
+data%>%ggplot(aes(x=availability_365,y=price))+geom_point(size=1,alpha = 0.2)
+
+
+
+```
+
+
+### 2.11 DISTRIBUTION OF PRICE VS LAST REVIEW YEAR (FEATURE EXTRACTED FROM LAST_REVIEW_DATE) :
+
+
+```{r , echo=FALSE,fig10, fig.height = 4, fig.width = 8, fig.align = "center"}
+
+last_review_date<-as.Date(data$last_review)
+f_last_review_year = factor(format(last_review_date,'%Y'))
+data<-data%>%mutate(Annual=f_last_review_year)
+
+data%>%filter(price<5000)%>%ggplot(aes(x=Annual,y=price))+geom_point(size=1,alpha = 0.2)
+
+
+
+
+```
+
+
+### 2.12 DISTRIBUTION OF PRICE VS HOST LISTINGS :
+
+
+
+```{r , echo=FALSE,fig11, fig.height = 4, fig.width = 8, fig.align = "center"}
+data%>%ggplot(aes(x=calculated_host_listings_count,y=price))+geom_point(size=1,alpha = 0.2)
+
+
+```
+
+
+
+### 2.13 DISTRIBUTION OF PRICE VS NEIGHBOURHOOD MEDIAN (GRAPGH WITH nbg_median>150) :
+
+
+
+```{r , echo=FALSE,fig12, fig.height = 4, fig.width = 8, fig.align = "center"}
+data%>%group_by(neighbourhood)%>%summarize(nbg_median=median(price),Rank=rank(-nbg_median))%>%filter(nbg_median>150)%>%ggplot(aes(x=neighbourhood, y=nbg_median))+geom_point()+theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+
+
+### 2.14 DISTRIBUTION OF PRICE VS ROOMTYPE :
+
+
+
+```{r , echo=FALSE,fig13, fig.height = 4, fig.width = 8, fig.align = "center"}
+data%>%filter(price<1000)%>%ggplot(aes(room_type,price))+geom_boxplot()
+
+
+```
+
+\leavevmode 
+\newline
+
+## 3 METHODOLOGY :
+
+
+```{r , echo=FALSE,include=FALSE}
+
+
+avg_year<-round(mean(as.numeric(paste(data$Annual[!is.na(data$Annual)]))))
+
+data$Annual[is.na(data$Annual)]=factor(avg_year)
+
+data$reviews_per_month[is.na(data$reviews_per_month)]=median((data$reviews_per_month[!is.na(data$reviews_per_month)]))
+
+
+
+data<-data%>%group_by(neighbourhood_group)%>%mutate(nbg_group_median=median(price),nbg_group_mean=mean(price))
+
+data<-data%>%group_by(neighbourhood)%>%mutate(nbg_median=median(price),nbg_mean=mean(price))
+
+
+
+#CREATING MATRIX
+
+
+M <-data.frame(data$price,data$latitude,data$longitude,data$neighbourhood_group,data$neighbourhood,data$room_type,data$number_of_reviews,data$calculated_host_listings_count,data$minimum_nights,data$reviews_per_month,data$Annual)
+
+
+#Splitting Data
+
+t1_index_ <- createDataPartition(y = M$data.price, times = 1, p = 0.2, list = FALSE)
+train <- M[-t1_index_,]
+validation_set <- M[t1_index_,]
+
+
+t2_index_ <- createDataPartition(y = train$data.price, times = 1, p = 0.25, list = FALSE)
+train_set <- M[-t2_index_,]
+test_set <- M[t2_index_,]
+
+
+```
+
+\leavevmode 
+\newline
+
+After the above analysis of data, Model is built by taking the columns : 
+**latitude**, **longitude**, **neighbourhood_group**, **neighbourhood**, **room_type**, **number_of_reviews**, **calculated_host_listings_count**, **minimum_nights**, **reviews_per_month**, **Annual**
+
+
+
+**Annual** - Contains the year which had the last review, a feature exctracted from **last_review**. Missing Values of the year in the data are filled by the taking the mean of the years and rounding to the nearest year which turns out to be 2018.
+
+
+
+The dataset is split into three sets :  **Train set** , **Test Set**  , **Validation Set** in the **0.6 : 0.2 : 0.2** 
+
+
+\newpage
+
+### 3.1 SIMPLE LINEAR REGRESSION MODEL :
+
+\leavevmode 
+\newline
+
+A simple linear regression is performed on **Y** = **price** and **X** containing the columns **latitude**, **longitude**, **neighbourhood_group**, **neighbourhood**, **room_type**, **number_of_reviews**, **calculated_host_listings_count**, **minimum_nights**, **reviews_per_month**, **Annual**.
+
+\leavevmode 
+\newline
+
+#### Training is performed on the **train_set** :
+
+
+```{r,echo=TRUE,warning=FALSE }
+Model_1 <- train(data.price ~ ., data = train_set,
+                      method = "lm")
+```
+
+#### Summary of the trained model :
+
+```{r}
+Model_1$results
+```
+
+#### Prediction is performed on the **test_set** :
+
+```{r,echo=TRUE,warning=FALSE}
+Model_1_predict<-predict(Model_1,test_set)
+```
+
+#### RMSE Error on **test_set** :
+```{r}
+RMSE(Model_1_predict,test_set$data.price)
+```
+
+```{r, echo=FALSE}
+RMSE_results <- data_frame(method = "SIMPLE LINEAR REGRESSION MODEL", RMSE = RMSE(Model_1_predict,test_set$data.price))
+
+```
+
+
+\newpage
+### 3.2 LOG LINEAR REGRESSION MODEL OF PRICE :
+\leavevmode 
+\newline
+
+A log linear regression is performed on **Y** = **log(1+price)** and **X** containing the columns **latitude**, **longitude**, **neighbourhood_group**, **neighbourhood**, **room_type**, **number_of_reviews**, **calculated_host_listings_count**, **minimum_nights**, **reviews_per_month**, **Annual**.
+
+\leavevmode 
+\newline
+
+#### Training is performed on the **train_set** :
+
+
+```{r,echo=TRUE,warning=FALSE }
+Model_2 <- train(log(1+data.price) ~ ., data = train_set,
+                        method = "lm")
+
+```
+
+#### Summary of the trained model :
+
+```{r}
+Model_2$results
+```
+
+#### Prediction is performed on the **test_set** :
+
+```{r,echo=TRUE,warning=FALSE}
+Model_2_predict<-predict(Model_2,test_set)
+```
+
+#### RMSE Error on **test_set** :
+
+```{r}
+RMSE(exp(Model_2_predict)-1,test_set$data.price)
+```
+
+```{r, echo=FALSE}
+RMSE_results <- bind_rows(RMSE_results,
+                          data_frame(method="LOG LINEAR REGRESSION MODEL",RMSE = RMSE(exp(Model_2_predict)-1,test_set$data.price) ))
+```
+
+\newpage
+
+
+
+
+
+
+### 3.3 XGBOOST LINEAR MODEL :
+
+
+XGBoost Linear Algorithm which is designed to be highly efficient and flexible is applied on **train_set** and further tested on **test_set**.
+
+\leavevmode 
+\newline
+
+#### Training is performed on the **train_set** :
+
+
+```{r,echo=TRUE,warning=FALSE }
+Model_3 <- train(log(1+data.price) ~ ., data = train_set,
+                        method = "xgbLinear",tuneGrid = expand.grid(nrounds=50,lambda=c(.01,.1),alpha =c(.01, .1),eta = .3))
+
+```
+
+
+#### Prediction is performed on the **test_set** :
+
+```{r,echo=TRUE,warning=FALSE}
+Model_3_predict<-predict(Model_3,test_set)
+```
+
+#### RMSE Error on **test_set** :
+
+```{r}
+RMSE(exp(Model_3_predict)-1,test_set$data.price)
+```
+
+```{r, echo=FALSE}
+RMSE_results <- bind_rows(RMSE_results,
+                          data_frame(method="XGBOOST LINEAR MODEL",RMSE = RMSE(exp(Model_3_predict)-1,test_set$data.price) ))
+```
+
+\newpage
+
+
+## 4 RESULTS :
+
+The results obtained by running the above three models by performing training on **train_set** dataset and further testing on the **test_set ** dataset are as follows :
+
+
+```{r, echo=FALSE,warning=FALSE}
+RMSE_results %>% knitr::kable()
+```
+
+Therefore, the RMSE error is least for the **XGBoost Linear Model**.
+
+\leavevmode 
+\newline
+
+Applying the **XGBoost Linear Model** on the **validation_set**
+
+
+#### Prediction is performed on the **validation_set** :
+
+```{r,echo=TRUE,warning=FALSE}
+VALIDATION_predict<-predict(Model_3,validation_set)
+```
+
+#### RMSE Error on **validation_set** :
+
+```{r}
+RMSE(exp(VALIDATION_predict)-1,validation_set$data.price)
+```
+
+The high RMSE Value are due to the Outliers present in the form of High Price Houses in the dataset.
+Thus this makes it necessary to calculate an RMSE without taking into consideration the outliers for an estimate of RMSE error of the model on dataset without the outliers.
+
+#### Calculating the RMSE for the validation data_Set excluding the top 10 percent values.
+
+```{r,warning=FALSE}
+index<-validation_set$data.price < quantile(validation_set$data.price,0.95)
+VALIDATION_RMSE_<-RMSE(exp(VALIDATION_predict[index])-1,validation_set$data.price[index])
+```
+
+#### RMSE Error for the validation set excluding the outliers
+
+```{r,warning=FALSE}
+tibble(method = "XGBLINEAR BOOST ON VALIDATION_SET RMSE AFTER FILTERING OUT OUTLIERS"
+       , RMSE = VALIDATION_RMSE_)%>%knitr::kable()
+
+```
+
+\newpage
+
+## 5 CONCLUSIONS :
+
+XgbLinear is the algorithm leading to the least RMSE value for the **test_set**. Further utilization of this algorithm for evalution of the **validation_set** leads to an RMSE error value of :
+
+```{r}
+tibble(method = "XGBLINEAR BOOST ON VALIDATION_SET "
+       , RMSE =RMSE(exp(VALIDATION_predict)-1,validation_set$data.price))%>%knitr::kable()
+
+```
+
+Also the further analysis of the final model after removing outliers for the **validation_set**, provides a conclusion that the model fits in the better way for the housings after removing the top 5 percent outliers. This is evident by the RMSE value :
+
+```{r,warning=FALSE}
+tibble(method = "VALIDATION_SET RMSE AFTER FILTERING OUT OUTLIERS"
+       , RMSE = VALIDATION_RMSE_)%>%knitr::kable()
+```
